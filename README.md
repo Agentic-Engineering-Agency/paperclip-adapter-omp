@@ -14,16 +14,16 @@ This package lets Paperclip invoke `omp --mode json --print`, parse the event st
 
 ## Install
 
-Current install path (works before npm publish):
-
-```sh
-npm install git+https://github.com/Agentic-Engineering-Agency/paperclip-adapter-omp.git
-```
-
-After npm publish:
+npm package:
 
 ```sh
 npm install @agentic-engineering-agency/paperclip-adapter-omp
+```
+
+GitHub fallback:
+
+```sh
+npm install git+https://github.com/Agentic-Engineering-Agency/paperclip-adapter-omp.git
 ```
 
 Host runtime requirement:
