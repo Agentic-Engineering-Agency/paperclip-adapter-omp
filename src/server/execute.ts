@@ -19,10 +19,10 @@ import { parseOmpStreamJson, isOmpUnknownSessionError } from "./parse.js";
 
 const OMP_FINAL_DISPOSITION_MANDATE = [
   "Mandatory final action before exit:",
-  "- A successful run is invalid until the current Paperclip issue has a concrete disposition.",
-  "- Before your final response, update the issue through Paperclip tooling/API to one of: done, cancelled, in_review with owner/reviewer, blocked with blocker owner/action, delegated follow-up issue, or explicit continuation with the next concrete action.",
-  "- Do not rely on comments, documents, logs, screenshots, progress summaries, or Remaining bullets as the disposition.",
-  "- If work must continue, record explicit continuation on the issue before exiting; never leave a successful heartbeat in plain in_progress with no next-step state.",
+  "- A successful run is invalid until the current Paperclip issue has both (1) a durable issue comment/work artifact and (2) a concrete disposition.",
+  "- Before your final response, write an issue comment summarizing completed work or the exact blocker/next action; then update the issue through Paperclip tooling/API to one of: done, cancelled, in_review with owner/reviewer, blocked with blocker owner/action, delegated follow-up issue, or explicit continuation with the next concrete action.",
+  "- Do not rely on documents, logs, screenshots, progress summaries, or Remaining bullets as the issue comment or disposition.",
+  "- If work must continue, record explicit continuation on the issue before exiting; never leave a successful heartbeat in plain in_progress with no next-step state and never exit without an issue comment.",
 ].join("\n");
 
 function parseEnvText(value: string): Record<string, string> {
