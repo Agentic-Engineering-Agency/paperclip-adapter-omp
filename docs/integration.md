@@ -1,9 +1,20 @@
 # Paperclip integration
 
-This adapter is a standalone package. Paperclip still needs to register it in the three adapter registries.
+This adapter is a standalone package. Preferred integration is Paperclip's external adapter manager. Direct source registry wiring is still supported for Paperclip forks that want to vendor the adapter.
 
-## 1. Server registry
+## 1. External adapter manager
 
+```sh
+paperclipai adapter install --payload-json '{"packageName":"@agentic-engineering-agency/paperclip-adapter-omp","version":"0.1.2"}'
+```
+
+The package root exports `createServerAdapter()`, `./ui-parser` exposes a standalone browser-safe `parseStdoutLine`, and `package.json` declares `paperclip.adapterUiParser = "1.0.0"`.
+
+## 2. Source registry integration
+
+Use this path only when editing Paperclip source directly instead of using external adapter install.
+
+### Server registry
 Add the package dependency to Paperclip server workspace, then register a `ServerAdapterModule`:
 
 ```ts
@@ -29,7 +40,7 @@ const ompLocalAdapter = {
 
 Add `ompLocalAdapter` to Paperclip's adapter map.
 
-## 2. UI registry
+### UI registry
 
 The package exports parser/config builder only. Paperclip UI still owns the React config component.
 
@@ -57,7 +68,7 @@ Minimum UI fields:
 - `envVars`
 - `extraArgs`
 
-## 3. CLI registry
+### CLI registry
 
 ```ts
 import { type } from "@agentic-engineering-agency/paperclip-adapter-omp";
@@ -69,7 +80,7 @@ export const ompLocalCLIAdapter = {
 };
 ```
 
-## 4. Host setup
+## 3. Host setup
 
 Every host that can run `omp_local` agents needs:
 

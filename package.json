@@ -1,6 +1,6 @@
 {
   "name": "@agentic-engineering-agency/paperclip-adapter-omp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Paperclip adapter for running Oh My Pi (omp) as a local agent runtime.",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,10 @@
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "import": "./dist/cli/index.js"
+    },
+    "./ui-parser": {
+      "types": "./dist/ui-parser.d.ts",
+      "import": "./dist/ui-parser.js"
     }
   },
   "files": [
@@ -65,5 +69,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "paperclip": {
+    "adapterUiParser": "1.0.0"
+  }
 }

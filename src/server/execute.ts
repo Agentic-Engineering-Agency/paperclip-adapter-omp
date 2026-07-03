@@ -17,13 +17,31 @@ import {
 } from "@paperclipai/adapter-utils/server-utils";
 import { parseOmpStreamJson, isOmpUnknownSessionError } from "./parse.js";
 
+function parseEnvText(value: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const line of value.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf("=");
+    if (idx <= 0) continue;
+    env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+  }
+  return env;
+}
+
 function envFromConfig(value: unknown): Record<string, string> {
+  if (typeof value === "string") return parseEnvText(value);
   const env: Record<string, string> = {};
   const rec = parseObject(value);
   for (const [key, raw] of Object.entries(rec)) {
     if (typeof raw === "string") env[key] = raw;
   }
   return env;
+}
+
+function argsArrayFromConfig(value: unknown): string[] {
+  if (typeof value === "string") return value.split(/\s+/).filter(Boolean);
+  return asStringArray(value);
 }
 
 function contextString(ctx: AdapterExecutionContext, key: string): string {
@@ -82,7 +100,7 @@ function argsForRun(input: {
   if (asBoolean(config.hideThinking, false)) args.push("--hide-thinking");
   const maxTimeSec = asNumber(config.maxTimeSec, 0);
   if (maxTimeSec > 0) args.push("--max-time", String(maxTimeSec));
-  args.push(...asStringArray(config.extraArgs));
+  args.push(...argsArrayFromConfig(config.extraArgs));
   args.push(prompt);
   return args;
 }

@@ -39,10 +39,21 @@ Configure OMP providers separately, for example in `~/.omp/agent/models.yml`. Th
 
 | Export | Purpose |
 | --- | --- |
-| `@agentic-engineering-agency/paperclip-adapter-omp` | `type`, `label`, `models`, `modelProfiles`, `agentConfigurationDoc` |
+| `@agentic-engineering-agency/paperclip-adapter-omp` | `type`, `label`, `models`, `modelProfiles`, `agentConfigurationDoc`, `createServerAdapter` |
 | `@agentic-engineering-agency/paperclip-adapter-omp/server` | `execute`, `testEnvironment`, `sessionCodec`, parser helpers |
 | `@agentic-engineering-agency/paperclip-adapter-omp/ui` | `parseOmpStdoutLine`, `buildOmpLocalConfig` |
+| `@agentic-engineering-agency/paperclip-adapter-omp/ui-parser` | standalone browser-safe `parseStdoutLine` for external adapter manager |
 | `@agentic-engineering-agency/paperclip-adapter-omp/cli` | `printOmpStreamEvent` |
+
+## External adapter install
+
+Install through Paperclip's external adapter manager:
+
+```sh
+paperclipai adapter install --payload-json '{"packageName":"@agentic-engineering-agency/paperclip-adapter-omp","version":"0.1.2"}'
+```
+
+This package root exports `createServerAdapter()`. It also declares `paperclip.adapterUiParser = "1.0.0"` and exposes `./ui-parser` so Paperclip can serve the run transcript parser.
 
 ## Paperclip registration
 

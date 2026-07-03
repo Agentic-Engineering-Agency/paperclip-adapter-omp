@@ -1,7 +1,22 @@
 import path from "node:path";
 import { DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE, asBoolean, asNumber, asString, asStringArray, buildPaperclipEnv, ensureAbsoluteDirectory, ensureCommandResolvable, ensurePathInEnv, parseObject, redactEnvForLogs, renderTemplate, runChildProcess, } from "@paperclipai/adapter-utils/server-utils";
 import { parseOmpStreamJson, isOmpUnknownSessionError } from "./parse.js";
+function parseEnvText(value) {
+    const env = {};
+    for (const line of value.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#"))
+            continue;
+        const idx = trimmed.indexOf("=");
+        if (idx <= 0)
+            continue;
+        env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+    }
+    return env;
+}
 function envFromConfig(value) {
+    if (typeof value === "string")
+        return parseEnvText(value);
     const env = {};
     const rec = parseObject(value);
     for (const [key, raw] of Object.entries(rec)) {
@@ -9,6 +24,11 @@ function envFromConfig(value) {
             env[key] = raw;
     }
     return env;
+}
+function argsArrayFromConfig(value) {
+    if (typeof value === "string")
+        return value.split(/\s+/).filter(Boolean);
+    return asStringArray(value);
 }
 function contextString(ctx, key) {
     return asString(ctx.context[key], "");
@@ -72,7 +92,7 @@ function argsForRun(input) {
     const maxTimeSec = asNumber(config.maxTimeSec, 0);
     if (maxTimeSec > 0)
         args.push("--max-time", String(maxTimeSec));
-    args.push(...asStringArray(config.extraArgs));
+    args.push(...argsArrayFromConfig(config.extraArgs));
     args.push(prompt);
     return args;
 }

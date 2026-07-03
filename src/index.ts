@@ -1,4 +1,5 @@
-import type { AdapterModelProfileDefinition } from "@paperclipai/adapter-utils";
+import type { AdapterConfigSchema, AdapterModelProfileDefinition, AdapterRuntimeCommandSpec, ServerAdapterModule } from "@paperclipai/adapter-utils";
+import { execute, sessionCodec, testEnvironment } from "./server/index.js";
 
 export const type = "omp_local";
 export const label = "Oh My Pi (omp)";
@@ -81,3 +82,175 @@ Security:
 - This adapter runs a local coding agent with host filesystem access to cwd. Scope cwd carefully.
 - Avoid noTools/noLsp/noPty only when you intentionally want to restrict omp's tool surface.
 `;
+
+
+function getConfigSchema(): AdapterConfigSchema {
+  return {
+    fields: [
+      {
+        key: "command",
+        label: "omp command",
+        type: "text",
+        default: "omp",
+        hint: "Executable name or absolute path for the Oh My Pi CLI.",
+      },
+      {
+        key: "cwd",
+        label: "Working directory",
+        type: "text",
+        hint: "Absolute directory where omp runs. Defaults to the server process cwd when omitted.",
+      },
+      {
+        key: "model",
+        label: "Model",
+        type: "combobox",
+        options: models.map((model) => ({ value: model.id, label: model.label })),
+        hint: "Optional model passed to omp --model, for example omniroute/omp-agent.",
+      },
+      {
+        key: "thinking",
+        label: "Thinking effort",
+        type: "select",
+        default: "medium",
+        options: [
+          { value: "off", label: "Off" },
+          { value: "minimal", label: "Minimal" },
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+          { value: "xhigh", label: "Extra high" },
+          { value: "auto", label: "Auto" },
+        ],
+      },
+      {
+        key: "timeoutSec",
+        label: "Timeout seconds",
+        type: "number",
+        default: 3600,
+      },
+      {
+        key: "graceSec",
+        label: "Grace seconds",
+        type: "number",
+        default: 15,
+        hint: "Seconds to wait after terminating omp before killing the process.",
+      },
+      {
+        key: "maxTimeSec",
+        label: "OMP max time seconds",
+        type: "number",
+        hint: "Optional value passed to omp --max-time.",
+      },
+      {
+        key: "sessionDir",
+        label: "Session directory",
+        type: "text",
+        hint: "Optional value passed to omp --session-dir.",
+      },
+      {
+        key: "profile",
+        label: "OMP profile",
+        type: "text",
+        hint: "Optional value passed to omp --profile.",
+      },
+      {
+        key: "tools",
+        label: "Tools",
+        type: "text",
+        hint: "Optional comma-separated value passed to omp --tools.",
+      },
+      {
+        key: "skills",
+        label: "Skills",
+        type: "text",
+        hint: "Optional comma-separated value passed to omp --skills.",
+      },
+      {
+        key: "noTools",
+        label: "Disable tools",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --no-tools.",
+      },
+      {
+        key: "noLsp",
+        label: "Disable LSP",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --no-lsp.",
+      },
+      {
+        key: "noSkills",
+        label: "Disable skills",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --no-skills.",
+      },
+      {
+        key: "allowHome",
+        label: "Allow home access",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --allow-home.",
+      },
+      {
+        key: "advisor",
+        label: "Advisor mode",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --advisor.",
+      },
+      {
+        key: "hideThinking",
+        label: "Hide thinking",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --hide-thinking.",
+      },
+      {
+        key: "promptTemplate",
+        label: "Prompt template",
+        type: "textarea",
+        hint: "Optional Paperclip prompt template rendered for each run.",
+      },
+      {
+        key: "extraArgs",
+        label: "Extra args",
+        type: "textarea",
+        hint: "Optional literal extra arguments. Prefer dedicated fields when available.",
+      },
+      {
+        key: "env",
+        label: "Environment",
+        type: "textarea",
+        hint: "Optional environment variables for omp. Secrets are injected as env and redacted from logs.",
+      },
+    ],
+  };
+}
+
+function getRuntimeCommandSpec(config: Record<string, unknown>): AdapterRuntimeCommandSpec {
+  const command = typeof config.command === "string" && config.command.trim() ? config.command : "omp";
+  return {
+    command,
+    detectCommand: command,
+    installCommand: SANDBOX_INSTALL_COMMAND,
+  };
+}
+
+export function createServerAdapter(): ServerAdapterModule {
+  return {
+    type,
+    execute,
+    testEnvironment,
+    sessionCodec,
+    models,
+    modelProfiles,
+    supportsLocalAgentJwt: true,
+    agentConfigurationDoc,
+    getConfigSchema,
+    getRuntimeCommandSpec,
+  };
+}
+
+export { createServerAdapter as createOmpLocalServerAdapter };
