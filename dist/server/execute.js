@@ -1,6 +1,13 @@
 import path from "node:path";
 import { DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE, asBoolean, asNumber, asString, asStringArray, buildPaperclipEnv, ensureAbsoluteDirectory, ensureCommandResolvable, ensurePathInEnv, parseObject, redactEnvForLogs, renderTemplate, runChildProcess, } from "@paperclipai/adapter-utils/server-utils";
 import { parseOmpStreamJson, isOmpUnknownSessionError } from "./parse.js";
+const OMP_FINAL_DISPOSITION_MANDATE = [
+    "Mandatory final action before exit:",
+    "- A successful run is invalid until the current Paperclip issue has both (1) a durable issue comment/work artifact and (2) a concrete disposition.",
+    "- Before your final response, write an issue comment summarizing completed work or the exact blocker/next action; then update the issue through Paperclip tooling/API to one of: done, cancelled, in_review with owner/reviewer, blocked with blocker owner/action, delegated follow-up issue, or explicit continuation with the next concrete action.",
+    "- Do not rely on documents, logs, screenshots, progress summaries, or Remaining bullets as the issue comment or disposition.",
+    "- If work must continue, record explicit continuation on the issue before exiting; never leave a successful heartbeat in plain in_progress with no next-step state and never exit without an issue comment.",
+].join("\n");
 function parseEnvText(value) {
     const env = {};
     for (const line of value.split(/\r?\n/)) {
@@ -102,7 +109,7 @@ export async function execute(ctx) {
     const cwd = path.resolve(asString(config.cwd, process.cwd()));
     const timeoutSec = asNumber(config.timeoutSec, 3600);
     const graceSec = asNumber(config.graceSec, 15);
-    const promptTemplate = asString(config.promptTemplate, DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE);
+    const promptTemplate = [asString(config.promptTemplate, DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE), OMP_FINAL_DISPOSITION_MANDATE].join("\n\n");
     await ensureAbsoluteDirectory(cwd, { createIfMissing: true });
     const env = {
         ...process.env,
