@@ -25,7 +25,9 @@ The adapter passes model flags directly to OMP:
 - `plan` -> `--plan`
 - `thinking` or legacy `effort` -> `--thinking`
 
-This keeps model discovery and provider auth in OMP, not Paperclip.
+This keeps model routing and provider auth in OMP, not Paperclip.
+
+Model *discovery* for the Paperclip UI resolves through a three-tier chain: `omp models omniroute --json` on the host, then a direct gateway fetch of `$OMNIROUTE_BASE_URL/models` (default `https://omniroute.agenticengineering.lat/v1`, requires `OMNIROUTE_API_KEY`), then the static defaults in `src/model-catalog.ts`. Results are cached 5 minutes; the UI "refresh models" action bypasses the cache.
 
 ## Session fields
 

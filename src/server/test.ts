@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { AdapterEnvironmentCheck, AdapterEnvironmentTestContext, AdapterEnvironmentTestResult } from "@paperclipai/adapter-utils";
 import { asString, ensureAbsoluteDirectory, ensureCommandResolvable, ensurePathInEnv, parseObject } from "@paperclipai/adapter-utils/server-utils";
+import { discoverOmniRouteModels } from "./models.js";
 
 function statusFrom(checks: AdapterEnvironmentCheck[]): "pass" | "warn" | "fail" {
   if (checks.some((c) => c.level === "error")) return "fail";
@@ -33,6 +34,10 @@ export async function testEnvironment(ctx: AdapterEnvironmentTestContext): Promi
   const model = asString(config.model, "");
   if (model) checks.push({ code: "model_configured", level: "info", message: "Model configured", detail: model });
   else checks.push({ code: "model_default", level: "warn", message: "No explicit model configured", hint: "Set adapterConfig.model so agent runs are stable across host omp defaults." });
+
+  const { models, source } = await discoverOmniRouteModels();
+  if (source === "static") checks.push({ code: "models_static_fallback", level: "warn", message: "Model discovery fell back to static defaults", hint: "Ensure omp is on PATH or set OMNIROUTE_API_KEY." });
+  else checks.push({ code: "models_discovered", level: "info", message: "OmniRoute model discovery working", detail: `${models.length} models` });
 
   return { adapterType: ctx.adapterType, status: statusFrom(checks), checks, testedAt: new Date().toISOString() };
 }

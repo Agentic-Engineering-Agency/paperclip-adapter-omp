@@ -126,7 +126,7 @@ export async function execute(ctx) {
     const canResume = prior.sessionId.length > 0 && (prior.cwd.length === 0 || path.resolve(prior.cwd) === cwd);
     const resumeSessionId = canResume ? prior.sessionId : null;
     const runAttempt = async (sessionId) => {
-        const args = argsForRun({ config, prompt, sessionId, timeoutSec });
+        const args = argsForRun({ config, prompt, sessionId });
         await ctx.onMeta?.({
             adapterType: "omp_local",
             command,
@@ -143,12 +143,11 @@ export async function execute(ctx) {
             graceSec,
             onLog: ctx.onLog,
         });
-        return { proc, args };
+        return proc;
     };
-    let { proc } = await runAttempt(resumeSessionId);
+    let proc = await runAttempt(resumeSessionId);
     if (resumeSessionId && !proc.timedOut && proc.exitCode !== 0 && isOmpUnknownSessionError(`${proc.stdout}\n${proc.stderr}`)) {
-        const retry = await runAttempt(null);
-        proc = retry.proc;
+        proc = await runAttempt(null);
         const parsed = parseOmpStreamJson(proc.stdout);
         return toResult(proc, parsed, cwd, true);
     }

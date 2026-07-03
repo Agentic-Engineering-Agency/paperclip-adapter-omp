@@ -1,19 +1,13 @@
 import type { AdapterConfigSchema, AdapterModelProfileDefinition, AdapterRuntimeCommandSpec, ServerAdapterModule } from "@paperclipai/adapter-utils";
 import { execute, sessionCodec, testEnvironment } from "./server/index.js";
+import { listOmniRouteModels, refreshOmniRouteModels } from "./server/models.js";
+import { DEFAULT_OMNIROUTE_MODELS } from "./model-catalog.js";
 
 export const type = "omp_local";
 export const label = "Oh My Pi (omp)";
 export const SANDBOX_INSTALL_COMMAND = "npm install -g @oh-my-pi/pi-coding-agent";
 
-export const models = [
-  { id: "omniroute/omp-fast", label: "OmniRoute OMP Fast" },
-  { id: "omniroute/omp-agent", label: "OmniRoute OMP Agent" },
-  { id: "omniroute/auto/best-coding", label: "OmniRoute Auto Best Coding" },
-  { id: "omniroute/cc/claude-sonnet-5", label: "OmniRoute Claude Sonnet 5" },
-  { id: "omniroute/cc/claude-fable-5", label: "OmniRoute Claude Fable 5" },
-  { id: "omniroute/cc/claude-opus-4-8", label: "OmniRoute Claude Opus 4.8" },
-  { id: "omniroute/cc/claude-opus-4-7", label: "OmniRoute Claude Opus 4.7" },
-];
+export const models = DEFAULT_OMNIROUTE_MODELS;
 
 export const modelProfiles: AdapterModelProfileDefinition[] = [
   {
@@ -245,6 +239,8 @@ export function createServerAdapter(): ServerAdapterModule {
     testEnvironment,
     sessionCodec,
     models,
+    listModels: listOmniRouteModels,
+    refreshModels: refreshOmniRouteModels,
     modelProfiles,
     supportsLocalAgentJwt: true,
     agentConfigurationDoc,

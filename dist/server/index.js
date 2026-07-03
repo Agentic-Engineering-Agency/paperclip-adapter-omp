@@ -2,6 +2,7 @@ import { asString, parseObject } from "@paperclipai/adapter-utils/server-utils";
 export { execute } from "./execute.js";
 export { testEnvironment } from "./test.js";
 export { isOmpUnknownSessionError, parseOmpStreamJson } from "./parse.js";
+export { listOmniRouteModels, refreshOmniRouteModels, mapOmpCatalog, mapGatewayCatalog } from "./models.js";
 export const sessionCodec = {
     deserialize(raw) {
         const rec = parseObject(raw);

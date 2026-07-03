@@ -35,11 +35,21 @@ omp --version
 
 Configure OMP providers separately, for example in `~/.omp/agent/models.yml`. This adapter does not manage provider credentials; it launches OMP with Paperclip run env injected.
 
+## Model discovery
+
+`createServerAdapter()` exposes `listModels`/`refreshModels`, which resolve the OmniRoute catalog through a three-tier chain (each tier falls through on failure):
+
+1. `omp models omniroute --json` on the host (inherits omp catalog + `~/.omp/agent/models.yml` overrides); `refreshModels` runs `omp models refresh` first.
+2. Direct gateway fetch of `$OMNIROUTE_BASE_URL/models` (default `https://omniroute.agenticengineering.lat/v1`) with `Authorization: Bearer $OMNIROUTE_API_KEY`; skipped when the key is unset.
+3. Static defaults: the curated `models` list in `src/model-catalog.ts`.
+
+Results are cached for 5 minutes; `refreshModels` bypasses and repopulates the cache.
+
 ## Exports
 
 | Export | Purpose |
 | --- | --- |
-| `@agentic-engineering-agency/paperclip-adapter-omp` | `type`, `label`, `models`, `modelProfiles`, `agentConfigurationDoc`, `createServerAdapter` |
+| `@agentic-engineering-agency/paperclip-adapter-omp` | `type`, `label`, `models`, `modelProfiles`, `agentConfigurationDoc`, `createServerAdapter` (with `listModels`/`refreshModels`) |
 | `@agentic-engineering-agency/paperclip-adapter-omp/server` | `execute`, `testEnvironment`, `sessionCodec`, parser helpers |
 | `@agentic-engineering-agency/paperclip-adapter-omp/ui` | `parseOmpStdoutLine`, `buildOmpLocalConfig` |
 | `@agentic-engineering-agency/paperclip-adapter-omp/ui-parser` | standalone browser-safe `parseStdoutLine` for external adapter manager |

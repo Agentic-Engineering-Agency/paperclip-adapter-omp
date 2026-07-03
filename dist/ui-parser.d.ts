@@ -1,3 +1,2 @@
-import type { TranscriptEntry } from "@paperclipai/adapter-utils";
-export declare function parseStdoutLine(line: string, ts: string): TranscriptEntry[];
+export { parseOmpStdoutLine as parseStdoutLine } from "./ui/parse-stdout.js";
 //# sourceMappingURL=ui-parser.d.ts.map

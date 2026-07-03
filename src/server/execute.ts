@@ -71,7 +71,6 @@ function argsForRun(input: {
   config: Record<string, unknown>;
   prompt: string;
   sessionId: string | null;
-  timeoutSec: number;
 }): string[] {
   const { config, prompt, sessionId } = input;
   const args = ["--mode", "json", "--print"];
@@ -137,7 +136,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const resumeSessionId = canResume ? prior.sessionId : null;
 
   const runAttempt = async (sessionId: string | null) => {
-    const args = argsForRun({ config, prompt, sessionId, timeoutSec });
+    const args = argsForRun({ config, prompt, sessionId });
     await ctx.onMeta?.({
       adapterType: "omp_local",
       command,
@@ -154,13 +153,12 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       graceSec,
       onLog: ctx.onLog,
     });
-    return { proc, args };
+    return proc;
   };
 
-  let { proc } = await runAttempt(resumeSessionId);
+  let proc = await runAttempt(resumeSessionId);
   if (resumeSessionId && !proc.timedOut && proc.exitCode !== 0 && isOmpUnknownSessionError(`${proc.stdout}\n${proc.stderr}`)) {
-    const retry = await runAttempt(null);
-    proc = retry.proc;
+    proc = await runAttempt(null);
     const parsed = parseOmpStreamJson(proc.stdout);
     return toResult(proc, parsed, cwd, true);
   }

@@ -21,7 +21,5 @@ export function buildOmpLocalConfig(v: CreateConfigValues): Record<string, unkno
   if (v.promptTemplate) ac.promptTemplate = v.promptTemplate;
   if (v.extraArgs) ac.extraArgs = v.extraArgs.split(/\s+/).filter(Boolean);
   if (v.envVars) ac.env = parseEnvVars(v.envVars);
-  ac.timeoutSec = 3600;
-  ac.graceSec = 15;
   return ac;
 }
