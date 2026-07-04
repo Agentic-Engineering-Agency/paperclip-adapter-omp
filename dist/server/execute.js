@@ -156,10 +156,49 @@ export async function execute(ctx) {
     if (resumeSessionId && !proc.timedOut && proc.exitCode !== 0 && isOmpUnknownSessionError(`${proc.stdout}\n${proc.stderr}`)) {
         proc = await runAttempt(null);
         const parsed = parseOmpStreamJson(proc.stdout);
+        await recordFallbackContinuation(ctx, env, proc);
         return toResult(proc, parsed, cwd, true);
     }
     const parsed = parseOmpStreamJson(proc.stdout);
+    await recordFallbackContinuation(ctx, env, proc);
     return toResult(proc, parsed, cwd, false);
+}
+async function recordFallbackContinuation(ctx, env, proc) {
+    if (proc.exitCode !== 0 || proc.timedOut)
+        return;
+    const issueId = env.PAPERCLIP_TASK_ID || contextString(ctx, "issueId");
+    const apiUrl = env.PAPERCLIP_API_URL?.replace(/\/+$/, "");
+    if (!issueId || !apiUrl)
+        return;
+    const headers = { "Content-Type": "application/json" };
+    if (env.PAPERCLIP_API_KEY)
+        headers.Authorization = `Bearer ${env.PAPERCLIP_API_KEY}`;
+    try {
+        const current = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, { headers });
+        if (!current.ok)
+            return;
+        const issue = await current.json();
+        if (issue.status !== "in_progress")
+            return;
+        const identifier = typeof issue.identifier === "string" ? issue.identifier : issueId;
+        const body = [
+            "Adapter fallback: omp_local run exited successfully while the issue was still in_progress with no recorded disposition.",
+            `Recording explicit continuation for ${identifier}: return to todo so the assignee can continue with a concrete next action and choose a final disposition.`,
+        ].join("\n");
+        await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}/comments`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ body }),
+        });
+        await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ status: "todo" }),
+        });
+    }
+    catch {
+        // Fallback must never turn an otherwise successful agent run into an adapter failure.
+    }
 }
 function toResult(proc, parsed, cwd, clearSession) {
     const errorMessage = proc.exitCode === 0 && !proc.timedOut ? null : (parsed.errorMessage ?? proc.stderr.trim()) || `omp exited with code ${proc.exitCode ?? "null"}`;
