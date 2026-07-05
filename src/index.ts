@@ -1,4 +1,6 @@
 import type { AdapterConfigSchema, AdapterModelProfileDefinition, AdapterRuntimeCommandSpec, ServerAdapterModule } from "@paperclipai/adapter-utils";
+import { buildRuntimeMountedSkillSnapshot, readPaperclipRuntimeSkillEntries, resolvePaperclipDesiredSkillNames, writePaperclipSkillSyncPreference } from "@paperclipai/adapter-utils/server-utils";
+import { fileURLToPath } from "node:url";
 import { execute, sessionCodec, testEnvironment } from "./server/index.js";
 import { listOmniRouteModels, refreshOmniRouteModels } from "./server/models.js";
 import { DEFAULT_OMNIROUTE_MODELS } from "./model-catalog.js";
@@ -232,6 +234,28 @@ function getRuntimeCommandSpec(config: Record<string, unknown>): AdapterRuntimeC
   };
 }
 
+const moduleDir = fileURLToPath(new URL(".", import.meta.url));
+
+async function listSkills(ctx: Parameters<NonNullable<ServerAdapterModule["listSkills"]>>[0]) {
+  const availableEntries = await readPaperclipRuntimeSkillEntries(ctx.config, moduleDir);
+  const desiredSkills = resolvePaperclipDesiredSkillNames(ctx.config, availableEntries);
+
+  return buildRuntimeMountedSkillSnapshot({
+    adapterType: type,
+    availableEntries,
+    desiredSkills,
+    configuredDetail: "Paperclip materializes this skill into omp's runtime skill directory.",
+    missingDetail: "Paperclip has not materialized this skill into omp's runtime skill directory yet.",
+  });
+}
+
+async function syncSkills(ctx: Parameters<NonNullable<ServerAdapterModule["syncSkills"]>>[0], desiredSkills: string[]) {
+  return listSkills({
+    ...ctx,
+    config: writePaperclipSkillSyncPreference(ctx.config, desiredSkills),
+  });
+}
+
 export function createServerAdapter(): ServerAdapterModule {
   return {
     type,
@@ -243,6 +267,9 @@ export function createServerAdapter(): ServerAdapterModule {
     refreshModels: refreshOmniRouteModels,
     modelProfiles,
     supportsLocalAgentJwt: true,
+    requiresMaterializedRuntimeSkills: true,
+    listSkills,
+    syncSkills,
     agentConfigurationDoc,
     getConfigSchema,
     getRuntimeCommandSpec,

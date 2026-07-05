@@ -1,3 +1,5 @@
+import { buildRuntimeMountedSkillSnapshot, readPaperclipRuntimeSkillEntries, resolvePaperclipDesiredSkillNames, writePaperclipSkillSyncPreference } from "@paperclipai/adapter-utils/server-utils";
+import { fileURLToPath } from "node:url";
 import { execute, sessionCodec, testEnvironment } from "./server/index.js";
 import { listOmniRouteModels, refreshOmniRouteModels } from "./server/models.js";
 import { DEFAULT_OMNIROUTE_MODELS } from "./model-catalog.js";
@@ -223,6 +225,24 @@ function getRuntimeCommandSpec(config) {
         installCommand: SANDBOX_INSTALL_COMMAND,
     };
 }
+const moduleDir = fileURLToPath(new URL(".", import.meta.url));
+async function listSkills(ctx) {
+    const availableEntries = await readPaperclipRuntimeSkillEntries(ctx.config, moduleDir);
+    const desiredSkills = resolvePaperclipDesiredSkillNames(ctx.config, availableEntries);
+    return buildRuntimeMountedSkillSnapshot({
+        adapterType: type,
+        availableEntries,
+        desiredSkills,
+        configuredDetail: "Paperclip materializes this skill into omp's runtime skill directory.",
+        missingDetail: "Paperclip has not materialized this skill into omp's runtime skill directory yet.",
+    });
+}
+async function syncSkills(ctx, desiredSkills) {
+    return listSkills({
+        ...ctx,
+        config: writePaperclipSkillSyncPreference(ctx.config, desiredSkills),
+    });
+}
 export function createServerAdapter() {
     return {
         type,
@@ -234,6 +254,9 @@ export function createServerAdapter() {
         refreshModels: refreshOmniRouteModels,
         modelProfiles,
         supportsLocalAgentJwt: true,
+        requiresMaterializedRuntimeSkills: true,
+        listSkills,
+        syncSkills,
         agentConfigurationDoc,
         getConfigSchema,
         getRuntimeCommandSpec,

@@ -1,6 +1,6 @@
 {
   "name": "@agentic-engineering-agency/paperclip-adapter-omp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Paperclip adapter for running Oh My Pi (omp) as a local agent runtime.",
   "license": "MIT",
   "type": "module",
