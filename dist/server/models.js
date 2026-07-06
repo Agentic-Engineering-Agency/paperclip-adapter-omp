@@ -8,6 +8,9 @@ const OMP_MAX_BUFFER = 16 * 1024 * 1024;
 const GATEWAY_TIMEOUT_MS = 15_000;
 const DEFAULT_GATEWAY_BASE_URL = "https://omniroute.agenticengineering.lat/v1";
 let cache = null;
+export function clearOmniRouteModelCacheForTest() {
+    cache = null;
+}
 function dedupeById(models) {
     const seen = new Set();
     const out = [];

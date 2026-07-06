@@ -177,6 +177,18 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   return toResult(proc, parsed, cwd, false);
 }
 
+async function logFallbackContinuationFailure(ctx: AdapterExecutionContext, message: string): Promise<void> {
+  try {
+    if (ctx.onLog) {
+      await ctx.onLog("stderr", `${message}\n`);
+    } else {
+      console.warn(message);
+    }
+  } catch {
+    console.warn(message);
+  }
+}
+
 async function recordFallbackContinuation(
   ctx: AdapterExecutionContext,
   env: Record<string, string>,
@@ -192,7 +204,10 @@ async function recordFallbackContinuation(
 
   try {
     const current = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, { headers });
-    if (!current.ok) return;
+    if (!current.ok) {
+      await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: GET issue returned HTTP ${current.status}.`);
+      return;
+    }
     const issue = await current.json() as { status?: unknown; identifier?: unknown };
     if (issue.status !== "in_progress") return;
 
@@ -202,18 +217,27 @@ async function recordFallbackContinuation(
       `Recording explicit continuation for ${identifier}: return to todo so the assignee can continue with a concrete next action and choose a final disposition.`,
     ].join("\n");
 
-    await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}/comments`, {
+    const comment = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}/comments`, {
       method: "POST",
       headers,
       body: JSON.stringify({ body }),
     });
-    await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, {
+    if (!comment.ok) {
+      await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: POST comment returned HTTP ${comment.status}.`);
+      return;
+    }
+
+    const patch = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, {
       method: "PATCH",
       headers,
       body: JSON.stringify({ status: "todo" }),
     });
-  } catch {
-    // Fallback must never turn an otherwise successful agent run into an adapter failure.
+    if (!patch.ok) {
+      await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: PATCH issue returned HTTP ${patch.status}.`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: ${message}`);
   }
 }
 

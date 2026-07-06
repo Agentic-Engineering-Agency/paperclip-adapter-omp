@@ -5,7 +5,7 @@ This adapter is a standalone package. Preferred integration is Paperclip's exter
 ## 1. External adapter manager
 
 ```sh
-paperclipai adapter install --payload-json '{"packageName":"@agentic-engineering-agency/paperclip-adapter-omp","version":"0.1.2"}'
+paperclipai adapter install --payload-json '{"packageName":"@agentic-engineering-agency/paperclip-adapter-omp","version":"0.4.0"}'
 ```
 
 The package root exports `createServerAdapter()`, `./ui-parser` exposes a standalone browser-safe `parseStdoutLine`, and `package.json` declares `paperclip.adapterUiParser = "1.0.0"`.

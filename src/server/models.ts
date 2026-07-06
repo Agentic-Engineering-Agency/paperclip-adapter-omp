@@ -12,6 +12,10 @@ const GATEWAY_TIMEOUT_MS = 15_000;
 const DEFAULT_GATEWAY_BASE_URL = "https://omniroute.agenticengineering.lat/v1";
 
 let cache: { models: AdapterModel[]; at: number } | null = null;
+export function clearOmniRouteModelCacheForTest(): void {
+  cache = null;
+}
+
 
 function dedupeById(models: AdapterModel[]): AdapterModel[] {
   const seen = new Set<string>();

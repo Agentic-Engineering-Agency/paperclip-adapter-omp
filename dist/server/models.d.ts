@@ -1,4 +1,5 @@
 import type { AdapterModel } from "@paperclipai/adapter-utils";
+export declare function clearOmniRouteModelCacheForTest(): void;
 /** Map `omp models omniroute --json` output ({models: [{selector, name, id}]}) to AdapterModel[]. */
 export declare function mapOmpCatalog(json: unknown): AdapterModel[];
 /** Map OpenAI-style gateway `/v1/models` output ({data: [{id}]}) to AdapterModel[]. */

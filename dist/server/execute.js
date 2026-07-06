@@ -163,6 +163,19 @@ export async function execute(ctx) {
     await recordFallbackContinuation(ctx, env, proc);
     return toResult(proc, parsed, cwd, false);
 }
+async function logFallbackContinuationFailure(ctx, message) {
+    try {
+        if (ctx.onLog) {
+            await ctx.onLog("stderr", `${message}\n`);
+        }
+        else {
+            console.warn(message);
+        }
+    }
+    catch {
+        console.warn(message);
+    }
+}
 async function recordFallbackContinuation(ctx, env, proc) {
     if (proc.exitCode !== 0 || proc.timedOut)
         return;
@@ -175,8 +188,10 @@ async function recordFallbackContinuation(ctx, env, proc) {
         headers.Authorization = `Bearer ${env.PAPERCLIP_API_KEY}`;
     try {
         const current = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, { headers });
-        if (!current.ok)
+        if (!current.ok) {
+            await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: GET issue returned HTTP ${current.status}.`);
             return;
+        }
         const issue = await current.json();
         if (issue.status !== "in_progress")
             return;
@@ -185,19 +200,27 @@ async function recordFallbackContinuation(ctx, env, proc) {
             "Adapter fallback: omp_local run exited successfully while the issue was still in_progress with no recorded disposition.",
             `Recording explicit continuation for ${identifier}: return to todo so the assignee can continue with a concrete next action and choose a final disposition.`,
         ].join("\n");
-        await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}/comments`, {
+        const comment = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}/comments`, {
             method: "POST",
             headers,
             body: JSON.stringify({ body }),
         });
-        await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, {
+        if (!comment.ok) {
+            await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: POST comment returned HTTP ${comment.status}.`);
+            return;
+        }
+        const patch = await fetch(`${apiUrl}/api/issues/${encodeURIComponent(issueId)}`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({ status: "todo" }),
         });
+        if (!patch.ok) {
+            await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: PATCH issue returned HTTP ${patch.status}.`);
+        }
     }
-    catch {
-        // Fallback must never turn an otherwise successful agent run into an adapter failure.
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: ${message}`);
     }
 }
 function toResult(proc, parsed, cwd, clearSession) {

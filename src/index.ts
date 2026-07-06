@@ -104,6 +104,24 @@ function getConfigSchema(): AdapterConfigSchema {
         hint: "Optional model passed to omp --model, for example omniroute/omp-agent.",
       },
       {
+        key: "smol",
+        label: "Small model",
+        type: "text",
+        hint: "Optional model passed to omp --smol.",
+      },
+      {
+        key: "slow",
+        label: "Slow model",
+        type: "text",
+        hint: "Optional model passed to omp --slow.",
+      },
+      {
+        key: "plan",
+        label: "Planning model",
+        type: "text",
+        hint: "Optional model passed to omp --plan.",
+      },
+      {
         key: "thinking",
         label: "Thinking effort",
         type: "select",
@@ -162,6 +180,12 @@ function getConfigSchema(): AdapterConfigSchema {
         hint: "Optional comma-separated value passed to omp --skills.",
       },
       {
+        key: "configFiles",
+        label: "Config files",
+        type: "textarea",
+        hint: "Optional newline-separated paths passed to omp --config.",
+      },
+      {
         key: "noTools",
         label: "Disable tools",
         type: "toggle",
@@ -176,11 +200,32 @@ function getConfigSchema(): AdapterConfigSchema {
         hint: "Pass omp --no-lsp.",
       },
       {
+        key: "noPty",
+        label: "Disable PTY",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --no-pty.",
+      },
+      {
+        key: "noExtensions",
+        label: "Disable extensions",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --no-extensions.",
+      },
+      {
         key: "noSkills",
         label: "Disable skills",
         type: "toggle",
         default: false,
         hint: "Pass omp --no-skills.",
+      },
+      {
+        key: "noRules",
+        label: "Disable rules",
+        type: "toggle",
+        default: false,
+        hint: "Pass omp --no-rules.",
       },
       {
         key: "allowHome",

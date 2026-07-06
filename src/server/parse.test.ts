@@ -17,11 +17,50 @@ describe("parseOmpStreamJson", () => {
     expect(parsed.usage).toEqual({ inputTokens: 10, outputTokens: 2, cachedInputTokens: 3 });
     expect(parsed.costUsd).toBe(0.01);
   });
+
+  it("returns an empty parsed shape for empty stdout", () => {
+    expect(parseOmpStreamJson("")).toEqual({
+      sessionId: null,
+      provider: null,
+      model: null,
+      costUsd: null,
+      usage: null,
+      summary: "",
+      resultJson: null,
+      errorMessage: null,
+    });
+  });
+
+  it("ignores malformed JSON lines while parsing later valid events", () => {
+    const parsed = parseOmpStreamJson([
+      "not json",
+      JSON.stringify({ type: "session", id: "session-after-bad-line" }),
+      JSON.stringify({ type: "message_end", message: { role: "assistant", content: "ok" } }),
+    ].join("\n"));
+
+    expect(parsed.sessionId).toBe("session-after-bad-line");
+    expect(parsed.summary).toBe("ok");
+    expect(parsed.errorMessage).toBeNull();
+  });
+
+  it("extracts error text from malformed runs that still emit JSON error events", () => {
+    const parsed = parseOmpStreamJson([
+      "partial non-json output",
+      JSON.stringify({ type: "error", message: "ignored", error: { message: "could not find session missing-123" } }),
+    ].join("\n"));
+
+    expect(parsed.errorMessage).toBe("could not find session missing-123");
+    expect(isOmpUnknownSessionError(parsed.errorMessage)).toBe(true);
+  });
 });
 
 describe("isOmpUnknownSessionError", () => {
   it("detects missing session errors", () => {
     expect(isOmpUnknownSessionError("could not find session abc123")).toBe(true);
+  });
+
+  it("does not classify unrelated errors as unknown sessions", () => {
+    expect(isOmpUnknownSessionError("permission denied opening config file")).toBe(false);
   });
 });
 
