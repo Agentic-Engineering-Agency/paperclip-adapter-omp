@@ -1,5 +1,17 @@
 import path from "node:path";
 import type { AdapterExecutionContext, AdapterExecutionResult } from "@paperclipai/adapter-utils";
+import type { AdapterExecutionTarget } from "@paperclipai/adapter-utils/execution-target";
+import {
+  adapterExecutionTargetIsRemote,
+  adapterExecutionTargetSessionIdentity,
+  adapterExecutionTargetSessionMatches,
+  describeAdapterExecutionTarget,
+  ensureAdapterExecutionTargetCommandResolvable,
+  ensureAdapterExecutionTargetDirectory,
+  readAdapterExecutionTarget,
+  resolveAdapterExecutionTargetCwd,
+  runAdapterExecutionTargetProcess,
+} from "@paperclipai/adapter-utils/execution-target";
 import {
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   asBoolean,
@@ -7,15 +19,12 @@ import {
   asString,
   asStringArray,
   buildPaperclipEnv,
-  ensureAbsoluteDirectory,
-  ensureCommandResolvable,
   ensurePathInEnv,
   parseObject,
   redactEnvForLogs,
   renderTemplate,
-  runChildProcess,
 } from "@paperclipai/adapter-utils/server-utils";
-import { parseOmpStreamJson, isOmpUnknownSessionError } from "./parse.js";
+import { parseOmpStreamJson, isOmpUnknownSessionError, type ParsedOmpOutput } from "./parse.js";
 
 const OMP_FINAL_DISPOSITION_MANDATE = [
   "Mandatory final action before exit:",
@@ -72,7 +81,12 @@ function sessionFromRuntime(runtimeParams: Record<string, unknown> | null, legac
   const params = parseObject(runtimeParams);
   const sessionId = asString(params.sessionId, legacySessionId ?? "");
   const cwd = asString(params.cwd, "");
-  return { sessionId, cwd };
+  const remoteExecution = parseObject(params.remoteExecution);
+  return { sessionId, cwd, remoteExecution };
+}
+
+function normalizeCwdForSession(cwd: string, remote: boolean): string {
+  return remote ? path.posix.normalize(cwd) : path.resolve(cwd);
 }
 
 function argsForRun(input: {
@@ -115,11 +129,24 @@ function argsForRun(input: {
 export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult> {
   const config = parseObject(ctx.config);
   const command = asString(config.command, "omp");
-  const cwd = path.resolve(asString(config.cwd, process.cwd()));
+  const executionTarget = readAdapterExecutionTarget({
+    executionTarget: ctx.executionTarget,
+    legacyRemoteExecution: ctx.executionTransport?.remoteExecution,
+  });
+  const executionTargetIsRemote = adapterExecutionTargetIsRemote(executionTarget);
+  const cwd = resolveAdapterExecutionTargetCwd(executionTarget, asString(config.cwd, ""), process.cwd());
+  const normalizedCwd = normalizeCwdForSession(cwd, executionTargetIsRemote);
   const timeoutSec = asNumber(config.timeoutSec, 3600);
   const graceSec = asNumber(config.graceSec, 15);
   const promptTemplate = [asString(config.promptTemplate, DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE), OMP_FINAL_DISPOSITION_MANDATE].join("\n\n");
-  await ensureAbsoluteDirectory(cwd, { createIfMissing: true });
+  await ensureAdapterExecutionTargetDirectory(ctx.runId, executionTarget, cwd, {
+    cwd,
+    env: {},
+    createIfMissing: true,
+    timeoutSec: Math.min(timeoutSec, 30),
+    graceSec,
+    onLog: ctx.onLog,
+  });
 
   const env: Record<string, string> = {
     ...process.env,
@@ -136,11 +163,16 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   env.PAPERCLIP_LINKED_ISSUE_IDS = issueIds;
   if (ctx.authToken && !env.PAPERCLIP_API_KEY) env.PAPERCLIP_API_KEY = ctx.authToken;
   ensurePathInEnv(env);
-  await ensureCommandResolvable(command, cwd, env);
+  await ensureAdapterExecutionTargetCommandResolvable(command, executionTarget, cwd, env, {
+    installCommand: ctx.runtimeCommandSpec?.installCommand,
+    timeoutSec,
+  });
 
   const prompt = buildPrompt(ctx, promptTemplate);
   const prior = sessionFromRuntime(ctx.runtime.sessionParams, ctx.runtime.sessionId);
-  const canResume = prior.sessionId.length > 0 && (prior.cwd.length === 0 || path.resolve(prior.cwd) === cwd);
+  const sessionTargetMatches = executionTargetIsRemote ? adapterExecutionTargetSessionMatches(prior.remoteExecution, executionTarget) : true;
+  const sessionCwdMatches = prior.cwd.length === 0 || normalizeCwdForSession(prior.cwd, executionTargetIsRemote) === normalizedCwd;
+  const canResume = prior.sessionId.length > 0 && sessionTargetMatches && sessionCwdMatches;
   const resumeSessionId = canResume ? prior.sessionId : null;
 
   const runAttempt = async (sessionId: string | null) => {
@@ -149,17 +181,20 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       adapterType: "omp_local",
       command,
       cwd,
+      commandNotes: executionTargetIsRemote ? [`Execution target: ${describeAdapterExecutionTarget(executionTarget)}`] : undefined,
       commandArgs: args.slice(0, -1).concat("<prompt>"),
       env: redactEnvForLogs(env),
       prompt,
       context: ctx.context,
     });
-    const proc = await runChildProcess(ctx.runId, command, args, {
+    const proc = await runAdapterExecutionTargetProcess(ctx.runId, executionTarget, command, args, {
       cwd,
       env,
       timeoutSec,
       graceSec,
       onLog: ctx.onLog,
+      onRuntimeProgress: ctx.onRuntimeProgress,
+      onSpawn: ctx.onSpawn,
     });
     return proc;
   };
@@ -169,12 +204,12 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     proc = await runAttempt(null);
     const parsed = parseOmpStreamJson(proc.stdout);
     await recordFallbackContinuation(ctx, env, proc);
-    return toResult(proc, parsed, cwd, true);
+    return toResult(proc, parsed, cwd, executionTarget, true);
   }
 
   const parsed = parseOmpStreamJson(proc.stdout);
   await recordFallbackContinuation(ctx, env, proc);
-  return toResult(proc, parsed, cwd, false);
+  return toResult(proc, parsed, cwd, executionTarget, false);
 }
 
 async function logFallbackContinuationFailure(ctx: AdapterExecutionContext, message: string): Promise<void> {
@@ -243,8 +278,9 @@ async function recordFallbackContinuation(
 
 function toResult(
   proc: { exitCode: number | null; signal: string | null; timedOut: boolean; stdout: string; stderr: string },
-  parsed: ReturnType<typeof parseOmpStreamJson>,
+  parsed: ParsedOmpOutput,
   cwd: string,
+  executionTarget: AdapterExecutionTarget | null,
   clearSession: boolean,
 ): AdapterExecutionResult {
   const errorMessage = proc.exitCode === 0 && !proc.timedOut ? null : (parsed.errorMessage ?? proc.stderr.trim()) || `omp exited with code ${proc.exitCode ?? "null"}`;
@@ -255,7 +291,7 @@ function toResult(
     errorMessage,
     usage: parsed.usage ?? undefined,
     sessionId: parsed.sessionId,
-    sessionParams: parsed.sessionId ? { sessionId: parsed.sessionId, cwd } : null,
+    sessionParams: parsed.sessionId ? { sessionId: parsed.sessionId, cwd, remoteExecution: adapterExecutionTargetSessionIdentity(executionTarget) } : null,
     sessionDisplayId: parsed.sessionId,
     provider: parsed.provider,
     model: parsed.model,

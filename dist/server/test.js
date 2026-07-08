@@ -1,5 +1,5 @@
-import path from "node:path";
-import { asString, ensureAbsoluteDirectory, ensureCommandResolvable, ensurePathInEnv, parseObject } from "@paperclipai/adapter-utils/server-utils";
+import { describeAdapterExecutionTarget, ensureAdapterExecutionTargetCommandResolvable, ensureAdapterExecutionTargetDirectory, readAdapterExecutionTarget, resolveAdapterExecutionTargetCwd, } from "@paperclipai/adapter-utils/execution-target";
+import { asString, ensurePathInEnv, parseObject } from "@paperclipai/adapter-utils/server-utils";
 import { discoverOmniRouteModels } from "./models.js";
 function statusFrom(checks) {
     if (checks.some((c) => c.level === "error"))
@@ -11,23 +11,35 @@ function statusFrom(checks) {
 export async function testEnvironment(ctx) {
     const config = parseObject(ctx.config);
     const command = asString(config.command, "omp");
-    const cwdRaw = asString(config.cwd, process.cwd());
-    const cwd = path.resolve(cwdRaw);
+    const executionTarget = readAdapterExecutionTarget({
+        executionTarget: ctx.executionTarget,
+    });
+    const cwd = resolveAdapterExecutionTargetCwd(executionTarget, asString(config.cwd, ""), process.cwd());
     const checks = [];
-    const env = ensurePathInEnv({ ...process.env });
+    const env = Object.fromEntries(Object.entries(ensurePathInEnv({ ...process.env })).filter((entry) => typeof entry[1] === "string"));
+    const runId = `omp-envtest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    if (executionTarget?.kind === "remote") {
+        checks.push({ code: "execution_target", level: "info", message: `Probing inside environment: ${ctx.environmentName ?? describeAdapterExecutionTarget(executionTarget)}` });
+    }
     try {
-        await ensureAbsoluteDirectory(cwd, { createIfMissing: false });
+        await ensureAdapterExecutionTargetDirectory(runId, executionTarget, cwd, {
+            cwd,
+            env,
+            createIfMissing: false,
+            timeoutSec: 30,
+            graceSec: 5,
+        });
         checks.push({ code: "cwd_ok", level: "info", message: "Working directory exists", detail: cwd });
     }
     catch (err) {
-        checks.push({ code: "cwd_invalid", level: "error", message: "Working directory is not usable", detail: err instanceof Error ? err.message : String(err), hint: "Set adapterConfig.cwd to an existing absolute directory." });
+        checks.push({ code: "cwd_invalid", level: "error", message: "Working directory is not usable", detail: err instanceof Error ? err.message : String(err), hint: "Set adapterConfig.cwd to an existing directory in the selected environment." });
     }
     try {
-        await ensureCommandResolvable(command, cwd, env);
+        await ensureAdapterExecutionTargetCommandResolvable(command, executionTarget, cwd, env);
         checks.push({ code: "command_ok", level: "info", message: "omp command is resolvable", detail: command });
     }
     catch (err) {
-        checks.push({ code: "command_missing", level: "error", message: "omp command is not resolvable", detail: err instanceof Error ? err.message : String(err), hint: "Install omp and ensure it is on PATH, or set adapterConfig.command to its absolute path." });
+        checks.push({ code: "command_missing", level: "error", message: "omp command is not resolvable", detail: err instanceof Error ? err.message : String(err), hint: "Install omp in the selected environment or set adapterConfig.command to its absolute path." });
     }
     const model = asString(config.model, "");
     if (model)

@@ -141,6 +141,18 @@ describe("discoverOmniRouteModels", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("parses omp-cli output with banner lines printed before the JSON", async () => {
+    const json = JSON.stringify({ models: [{ selector: "omniroute/omp", name: "OMP", id: "omp" }] });
+    mockExecFileResult(`📊 Langfuse: Tracing enabled → https://langfuse.example\n${json}`);
+    const fetchMock = mockFetch({ data: [{ id: "gateway" }] });
+
+    await expect(discoverOmniRouteModels()).resolves.toEqual({
+      source: "omp-cli",
+      models: [{ id: "omniroute/omp", label: "OMP" }],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("falls through to the gateway when omp-cli discovery fails", async () => {
     mockExecFileError(new Error("omp unavailable"));
     vi.stubEnv("OMNIROUTE_API_KEY", "test-key");

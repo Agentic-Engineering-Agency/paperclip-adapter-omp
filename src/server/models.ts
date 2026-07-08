@@ -73,7 +73,10 @@ async function discoverViaOmp(): Promise<AdapterModel[]> {
     timeout: OMP_TIMEOUT_MS,
     maxBuffer: OMP_MAX_BUFFER,
   });
-  return mapOmpCatalog(JSON.parse(stdout));
+  // omp may print banner lines (e.g. Langfuse tracing notice) to stdout before the JSON.
+  const start = stdout.indexOf("{");
+  if (start < 0) return [];
+  return mapOmpCatalog(JSON.parse(stdout.slice(start)));
 }
 
 function gatewayModelsUrl(): string {

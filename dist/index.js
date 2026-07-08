@@ -24,14 +24,13 @@ export const agentConfigurationDoc = `# omp_local agent configuration
 Adapter: omp_local
 
 Use when:
-- The agent should run the Oh My Pi (omp) CLI locally on the Paperclip host
+- The agent should run the Oh My Pi (omp) CLI in the selected Paperclip execution environment: local host, SSH environment, or managed sandbox
 - You want direct access to omp providers, model roles, skills, rules, LSP, browser, and shell tooling
 - You need session persistence through omp's native session store
 - You want to route through a configured OpenAI-compatible gateway such as OmniRoute
 
 Don't use when:
-- omp is not installed on the host PATH
-- The agent must run in a remote sandbox without omp installed
+- omp cannot be installed or resolved in the selected execution environment
 - The task needs a minimal one-shot process runner rather than a full coding agent runtime
 - You need Claude Code subscription-only behavior; use claude_local for that path
 
@@ -70,7 +69,7 @@ Session behavior:
 
 Security:
 - Secrets belong in env, not promptTemplate.
-- This adapter runs a local coding agent with host filesystem access to cwd. Scope cwd carefully.
+- This adapter runs a coding agent with filesystem access to cwd inside the selected Paperclip execution environment. Scope cwd and environment assignment carefully.
 - Avoid noTools/noLsp/noPty only when you intentionally want to restrict omp's tool surface.
 `;
 function getConfigSchema() {
