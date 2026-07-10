@@ -7,6 +7,10 @@ const OMP_TIMEOUT_MS = 60_000;
 const OMP_MAX_BUFFER = 16 * 1024 * 1024;
 const GATEWAY_TIMEOUT_MS = 15_000;
 const DEFAULT_GATEWAY_BASE_URL = "https://omniroute.agenticengineering.lat/v1";
+const REMOVED_OMNIROUTE_MODEL_IDS = new Set(["omniroute/omp-fast"]);
+function isRemovedOmniRouteModel(id) {
+    return REMOVED_OMNIROUTE_MODEL_IDS.has(id);
+}
 let cache = null;
 export function clearOmniRouteModelCacheForTest() {
     cache = null;
@@ -35,7 +39,7 @@ export function mapOmpCatalog(json) {
             continue;
         const rec = entry;
         const selector = typeof rec.selector === "string" ? rec.selector : "";
-        if (!selector)
+        if (!selector || isRemovedOmniRouteModel(selector))
             continue;
         const rawId = typeof rec.id === "string" ? rec.id : selector;
         const name = typeof rec.name === "string" ? rec.name : "";
@@ -63,7 +67,10 @@ export function mapGatewayCatalog(json) {
         const id = entry.id;
         if (typeof id !== "string" || !id)
             continue;
-        mapped.push({ id: `omniroute/${id}`, label: id });
+        const selector = `omniroute/${id}`;
+        if (isRemovedOmniRouteModel(selector))
+            continue;
+        mapped.push({ id: selector, label: id });
     }
     return dedupeById(mapped).sort((a, b) => a.id.localeCompare(b.id));
 }

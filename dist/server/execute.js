@@ -249,8 +249,15 @@ async function recordFallbackContinuation(ctx, env, proc) {
         await logFallbackContinuationFailure(ctx, `omp_local fallback continuation skipped: ${message}`);
     }
 }
+function describeOmpExit(proc) {
+    if (proc.timedOut)
+        return "omp timed out";
+    if (proc.signal)
+        return "omp terminated by signal " + proc.signal;
+    return "omp exited with code " + (proc.exitCode ?? "null");
+}
 function toResult(proc, parsed, cwd, executionTarget, clearSession) {
-    const errorMessage = proc.exitCode === 0 && !proc.timedOut ? null : (parsed.errorMessage ?? proc.stderr.trim()) || `omp exited with code ${proc.exitCode ?? "null"}`;
+    const errorMessage = proc.exitCode === 0 && !proc.timedOut ? null : (parsed.errorMessage ?? proc.stderr.trim()) || describeOmpExit(proc);
     return {
         exitCode: proc.exitCode,
         signal: proc.signal,

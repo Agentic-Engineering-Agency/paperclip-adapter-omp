@@ -120,4 +120,20 @@ describe("execute", () => {
     expect(args).not.toContain("--resume");
     expect(args).not.toContain("old-session");
   });
+
+  it("reports signal exits explicitly when omp produces no stderr", async () => {
+    executionTargetMocks.runProcess.mockResolvedValueOnce({
+      exitCode: null,
+      signal: "SIGTERM",
+      timedOut: false,
+      stdout: "",
+      stderr: "",
+    });
+
+    const result = await execute(makeContext());
+
+    expect(result.errorMessage).toBe("omp terminated by signal SIGTERM");
+    expect(result.signal).toBe("SIGTERM");
+  });
+
 });

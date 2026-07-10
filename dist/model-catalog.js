@@ -36,7 +36,6 @@ export const DEFAULT_OMNIROUTE_MODELS = [
     { id: "omniroute/chenko-main-copy", label: "Chenko Main Copy" },
     { id: "omniroute/omp-agent", label: "OMP Agent" },
     { id: "omniroute/omp-commit", label: "OMP Commit" },
-    { id: "omniroute/omp-fast", label: "OMP Fast" },
     { id: "omniroute/seshat-1m", label: "Seshat 1M" },
     { id: "omniroute/seshat-agent", label: "Seshat Agent" },
     { id: "omniroute/seshat-commit", label: "Seshat Commit" },

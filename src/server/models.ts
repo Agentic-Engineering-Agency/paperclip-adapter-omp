@@ -10,6 +10,11 @@ const OMP_TIMEOUT_MS = 60_000;
 const OMP_MAX_BUFFER = 16 * 1024 * 1024;
 const GATEWAY_TIMEOUT_MS = 15_000;
 const DEFAULT_GATEWAY_BASE_URL = "https://omniroute.agenticengineering.lat/v1";
+const REMOVED_OMNIROUTE_MODEL_IDS = new Set(["omniroute/omp-fast"]);
+
+function isRemovedOmniRouteModel(id: string): boolean {
+  return REMOVED_OMNIROUTE_MODEL_IDS.has(id);
+}
 
 let cache: { models: AdapterModel[]; at: number } | null = null;
 export function clearOmniRouteModelCacheForTest(): void {
@@ -38,7 +43,7 @@ export function mapOmpCatalog(json: unknown): AdapterModel[] {
     if (typeof entry !== "object" || entry === null) continue;
     const rec = entry as Record<string, unknown>;
     const selector = typeof rec.selector === "string" ? rec.selector : "";
-    if (!selector) continue;
+    if (!selector || isRemovedOmniRouteModel(selector)) continue;
     const rawId = typeof rec.id === "string" ? rec.id : selector;
     const name = typeof rec.name === "string" ? rec.name : "";
     const label = name && name !== rawId ? name : rawId;
@@ -63,7 +68,9 @@ export function mapGatewayCatalog(json: unknown): AdapterModel[] {
     if (typeof entry !== "object" || entry === null) continue;
     const id = (entry as Record<string, unknown>).id;
     if (typeof id !== "string" || !id) continue;
-    mapped.push({ id: `omniroute/${id}`, label: id });
+    const selector = `omniroute/${id}`;
+    if (isRemovedOmniRouteModel(selector)) continue;
+    mapped.push({ id: selector, label: id });
   }
   return dedupeById(mapped).sort((a, b) => a.id.localeCompare(b.id));
 }

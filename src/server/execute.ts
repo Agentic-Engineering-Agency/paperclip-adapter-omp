@@ -276,6 +276,12 @@ async function recordFallbackContinuation(
   }
 }
 
+function describeOmpExit(proc: { exitCode: number | null; signal: string | null; timedOut: boolean }): string {
+  if (proc.timedOut) return "omp timed out";
+  if (proc.signal) return "omp terminated by signal " + proc.signal;
+  return "omp exited with code " + (proc.exitCode ?? "null");
+}
+
 function toResult(
   proc: { exitCode: number | null; signal: string | null; timedOut: boolean; stdout: string; stderr: string },
   parsed: ParsedOmpOutput,
@@ -283,7 +289,7 @@ function toResult(
   executionTarget: AdapterExecutionTarget | null,
   clearSession: boolean,
 ): AdapterExecutionResult {
-  const errorMessage = proc.exitCode === 0 && !proc.timedOut ? null : (parsed.errorMessage ?? proc.stderr.trim()) || `omp exited with code ${proc.exitCode ?? "null"}`;
+  const errorMessage = proc.exitCode === 0 && !proc.timedOut ? null : (parsed.errorMessage ?? proc.stderr.trim()) || describeOmpExit(proc);
   return {
     exitCode: proc.exitCode,
     signal: proc.signal,

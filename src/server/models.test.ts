@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { modelProfiles } from "../index.js";
 import { DEFAULT_OMNIROUTE_MODELS } from "../model-catalog.js";
 import { clearOmniRouteModelCacheForTest, discoverOmniRouteModels, listOmniRouteModels, mapGatewayCatalog, mapOmpCatalog } from "./models.js";
 
@@ -38,10 +39,33 @@ function mockFetch(json: unknown, ok = true) {
   return vi.mocked(fetchMock);
 }
 
+
+describe("static model defaults", () => {
+  it("does not advertise the removed omp-fast selector", () => {
+    expect(DEFAULT_OMNIROUTE_MODELS.map((model) => model.id)).not.toContain("omniroute/omp-fast");
+    expect(modelProfiles).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        adapterConfig: expect.objectContaining({ model: "omniroute/omp-fast" }),
+      }),
+    ]));
+  });
+});
+
 describe("mapOmpCatalog", () => {
   it("maps selector to id and name to label when name differs from id", () => {
     const result = mapOmpCatalog({ models: [{ selector: "omniroute/x", name: "X Model", id: "x" }] });
     expect(result).toEqual([{ id: "omniroute/x", label: "X Model" }]);
+  });
+
+  it("filters removed omp selectors from the CLI catalog", () => {
+    const result = mapOmpCatalog({
+      models: [
+        { selector: "omniroute/omp-fast", name: "OMP Fast", id: "omp-fast" },
+        { selector: "omniroute/auto/best-fast", name: "Auto Best Fast", id: "auto/best-fast" },
+      ],
+    });
+
+    expect(result.map((model) => model.id)).toEqual(["omniroute/auto/best-fast"]);
   });
 
   it("dedupes entries with the same selector, keeping the first occurrence", () => {
@@ -107,6 +131,12 @@ describe("mapGatewayCatalog", () => {
   it("maps id to an omniroute-prefixed id with the raw id as label", () => {
     const result = mapGatewayCatalog({ data: [{ id: "cc/claude" }] });
     expect(result).toEqual([{ id: "omniroute/cc/claude", label: "cc/claude" }]);
+  });
+
+  it("filters removed omp selectors from the gateway catalog", () => {
+    const result = mapGatewayCatalog({ data: [{ id: "omp-fast" }, { id: "auto/best-fast" }] });
+
+    expect(result.map((model) => model.id)).toEqual(["omniroute/auto/best-fast"]);
   });
 
   it("dedupes entries with the same id, keeping the first occurrence", () => {

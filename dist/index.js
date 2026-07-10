@@ -11,9 +11,9 @@ export const modelProfiles = [
     {
         key: "cheap",
         label: "Cheap",
-        description: "Use OMP's fast OmniRoute lane for lower-cost lightweight work.",
+        description: "Use OmniRoute's current best-fast lane for lower-cost lightweight work.",
         adapterConfig: {
-            model: "omniroute/omp-fast",
+            model: "omniroute/auto/best-fast",
             thinking: "low",
         },
         source: "adapter_default",
