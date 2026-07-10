@@ -8,6 +8,7 @@ import {
 } from "@paperclipai/adapter-utils/execution-target";
 import { asString, ensurePathInEnv, parseObject } from "@paperclipai/adapter-utils/server-utils";
 import { discoverOmniRouteModels } from "./models.js";
+import { ensureLocalOmpPath } from "./path.js";
 
 function statusFrom(checks: AdapterEnvironmentCheck[]): "pass" | "warn" | "fail" {
   if (checks.some((c) => c.level === "error")) return "fail";
@@ -23,7 +24,8 @@ export async function testEnvironment(ctx: AdapterEnvironmentTestContext): Promi
   });
   const cwd = resolveAdapterExecutionTargetCwd(executionTarget, asString(config.cwd, ""), process.cwd());
   const checks: AdapterEnvironmentCheck[] = [];
-  const env = Object.fromEntries(Object.entries(ensurePathInEnv({ ...process.env })).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const baseEnv = Object.fromEntries(Object.entries(ensurePathInEnv({ ...process.env })).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const env = executionTarget?.kind === "remote" ? baseEnv : ensureLocalOmpPath(baseEnv);
   const runId = `omp-envtest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   if (executionTarget?.kind === "remote") {

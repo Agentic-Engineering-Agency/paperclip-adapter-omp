@@ -25,6 +25,7 @@ import {
   renderTemplate,
 } from "@paperclipai/adapter-utils/server-utils";
 import { parseOmpStreamJson, isOmpUnknownSessionError, type ParsedOmpOutput } from "./parse.js";
+import { ensureLocalOmpPath } from "./path.js";
 
 const OMP_FINAL_DISPOSITION_MANDATE = [
   "Mandatory final action before exit:",
@@ -162,8 +163,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const issueIds = Array.isArray(ctx.context.issueIds) ? ctx.context.issueIds.filter((v) => typeof v === "string").join(",") : "";
   env.PAPERCLIP_LINKED_ISSUE_IDS = issueIds;
   if (ctx.authToken && !env.PAPERCLIP_API_KEY) env.PAPERCLIP_API_KEY = ctx.authToken;
-  ensurePathInEnv(env);
-  await ensureAdapterExecutionTargetCommandResolvable(command, executionTarget, cwd, env, {
+  const baseEnv = Object.fromEntries(Object.entries(ensurePathInEnv(env)).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const runEnv = executionTargetIsRemote ? baseEnv : ensureLocalOmpPath(baseEnv);
+  await ensureAdapterExecutionTargetCommandResolvable(command, executionTarget, cwd, runEnv, {
     installCommand: ctx.runtimeCommandSpec?.installCommand,
     timeoutSec,
   });
@@ -183,13 +185,13 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       cwd,
       commandNotes: executionTargetIsRemote ? [`Execution target: ${describeAdapterExecutionTarget(executionTarget)}`] : undefined,
       commandArgs: args.slice(0, -1).concat("<prompt>"),
-      env: redactEnvForLogs(env),
+      env: redactEnvForLogs(runEnv),
       prompt,
       context: ctx.context,
     });
     const proc = await runAdapterExecutionTargetProcess(ctx.runId, executionTarget, command, args, {
       cwd,
-      env,
+      env: runEnv,
       timeoutSec,
       graceSec,
       onLog: ctx.onLog,
@@ -203,12 +205,12 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   if (resumeSessionId && !proc.timedOut && proc.exitCode !== 0 && isOmpUnknownSessionError(`${proc.stdout}\n${proc.stderr}`)) {
     proc = await runAttempt(null);
     const parsed = parseOmpStreamJson(proc.stdout);
-    await recordFallbackContinuation(ctx, env, proc);
+    await recordFallbackContinuation(ctx, runEnv, proc);
     return toResult(proc, parsed, cwd, executionTarget, true);
   }
 
   const parsed = parseOmpStreamJson(proc.stdout);
-  await recordFallbackContinuation(ctx, env, proc);
+  await recordFallbackContinuation(ctx, runEnv, proc);
   return toResult(proc, parsed, cwd, executionTarget, false);
 }
 
