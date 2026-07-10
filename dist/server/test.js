@@ -1,6 +1,7 @@
 import { describeAdapterExecutionTarget, ensureAdapterExecutionTargetCommandResolvable, ensureAdapterExecutionTargetDirectory, readAdapterExecutionTarget, resolveAdapterExecutionTargetCwd, } from "@paperclipai/adapter-utils/execution-target";
 import { asString, ensurePathInEnv, parseObject } from "@paperclipai/adapter-utils/server-utils";
 import { discoverOmniRouteModels } from "./models.js";
+import { ensureLocalOmpPath } from "./path.js";
 function statusFrom(checks) {
     if (checks.some((c) => c.level === "error"))
         return "fail";
@@ -16,7 +17,8 @@ export async function testEnvironment(ctx) {
     });
     const cwd = resolveAdapterExecutionTargetCwd(executionTarget, asString(config.cwd, ""), process.cwd());
     const checks = [];
-    const env = Object.fromEntries(Object.entries(ensurePathInEnv({ ...process.env })).filter((entry) => typeof entry[1] === "string"));
+    const baseEnv = Object.fromEntries(Object.entries(ensurePathInEnv({ ...process.env })).filter((entry) => typeof entry[1] === "string"));
+    const env = executionTarget?.kind === "remote" ? baseEnv : ensureLocalOmpPath(baseEnv);
     const runId = `omp-envtest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     if (executionTarget?.kind === "remote") {
         checks.push({ code: "execution_target", level: "info", message: `Probing inside environment: ${ctx.environmentName ?? describeAdapterExecutionTarget(executionTarget)}` });

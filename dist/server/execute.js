@@ -2,6 +2,7 @@ import path from "node:path";
 import { adapterExecutionTargetIsRemote, adapterExecutionTargetSessionIdentity, adapterExecutionTargetSessionMatches, describeAdapterExecutionTarget, ensureAdapterExecutionTargetCommandResolvable, ensureAdapterExecutionTargetDirectory, readAdapterExecutionTarget, resolveAdapterExecutionTargetCwd, runAdapterExecutionTargetProcess, } from "@paperclipai/adapter-utils/execution-target";
 import { DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE, asBoolean, asNumber, asString, asStringArray, buildPaperclipEnv, ensurePathInEnv, parseObject, redactEnvForLogs, renderTemplate, } from "@paperclipai/adapter-utils/server-utils";
 import { parseOmpStreamJson, isOmpUnknownSessionError } from "./parse.js";
+import { ensureLocalOmpPath } from "./path.js";
 const OMP_FINAL_DISPOSITION_MANDATE = [
     "Mandatory final action before exit:",
     "- A successful run is invalid until the current Paperclip issue has both (1) a durable issue comment/work artifact and (2) a concrete disposition.",
@@ -144,8 +145,9 @@ export async function execute(ctx) {
     env.PAPERCLIP_LINKED_ISSUE_IDS = issueIds;
     if (ctx.authToken && !env.PAPERCLIP_API_KEY)
         env.PAPERCLIP_API_KEY = ctx.authToken;
-    ensurePathInEnv(env);
-    await ensureAdapterExecutionTargetCommandResolvable(command, executionTarget, cwd, env, {
+    const baseEnv = Object.fromEntries(Object.entries(ensurePathInEnv(env)).filter((entry) => typeof entry[1] === "string"));
+    const runEnv = executionTargetIsRemote ? baseEnv : ensureLocalOmpPath(baseEnv);
+    await ensureAdapterExecutionTargetCommandResolvable(command, executionTarget, cwd, runEnv, {
         installCommand: ctx.runtimeCommandSpec?.installCommand,
         timeoutSec,
     });
@@ -163,13 +165,13 @@ export async function execute(ctx) {
             cwd,
             commandNotes: executionTargetIsRemote ? [`Execution target: ${describeAdapterExecutionTarget(executionTarget)}`] : undefined,
             commandArgs: args.slice(0, -1).concat("<prompt>"),
-            env: redactEnvForLogs(env),
+            env: redactEnvForLogs(runEnv),
             prompt,
             context: ctx.context,
         });
         const proc = await runAdapterExecutionTargetProcess(ctx.runId, executionTarget, command, args, {
             cwd,
-            env,
+            env: runEnv,
             timeoutSec,
             graceSec,
             onLog: ctx.onLog,
@@ -182,11 +184,11 @@ export async function execute(ctx) {
     if (resumeSessionId && !proc.timedOut && proc.exitCode !== 0 && isOmpUnknownSessionError(`${proc.stdout}\n${proc.stderr}`)) {
         proc = await runAttempt(null);
         const parsed = parseOmpStreamJson(proc.stdout);
-        await recordFallbackContinuation(ctx, env, proc);
+        await recordFallbackContinuation(ctx, runEnv, proc);
         return toResult(proc, parsed, cwd, executionTarget, true);
     }
     const parsed = parseOmpStreamJson(proc.stdout);
-    await recordFallbackContinuation(ctx, env, proc);
+    await recordFallbackContinuation(ctx, runEnv, proc);
     return toResult(proc, parsed, cwd, executionTarget, false);
 }
 async function logFallbackContinuationFailure(ctx, message) {
